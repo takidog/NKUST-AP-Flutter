@@ -46,20 +46,21 @@ dependencies:
   date_range_picker: 1.0.6
   image: ^2.1.4
   flutter_image_compress: 0.6.7
-#  image_picker_web: 1.0.8
-
+  #  image_picker_web: 1.0.8
+  nkust_api:
+    git:
+      url: git@github.com:takidog/NKUST_API_Dart.git
+      ref: develop
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-
 
 # For information on the generic Dart part of this file, see the
 # following page: https://www.dartlang.org/tools/pub/pubspec
 
 # The following section is specific to Flutter.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

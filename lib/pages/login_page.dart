@@ -13,6 +13,7 @@ import 'package:nkust_ap/pages/search_student_id_page.dart';
 import 'package:nkust_ap/res/assets.dart';
 import 'package:nkust_ap/utils/global.dart';
 import 'package:nkust_ap/widgets/share_data_widget.dart';
+import 'package:nkust_api/nkust_api.dart';
 
 class LoginPage extends StatefulWidget {
   static const String routerName = "/login";
@@ -178,13 +179,17 @@ class LoginPageState extends State<LoginPage> {
         barrierDismissible: false,
       );
       Preferences.setString(Constants.PREF_USERNAME, _username.text);
-      Helper.instance.login(
-        username: _username.text,
-        password: _password.text,
-        callback: GeneralCallback<LoginResponse>(
-          onSuccess: (LoginResponse response) async {
+
+      NKUST_API.instance
+          .apLogin(_username.text, _password.text)
+          .then((ResponseData value) async {
+        print(
+            "Login debug message errorCode:${value.errorCode}, errorMessage:${value.errorMessage}");
+
+        switch (value.errorCode) {
+          case 1000:
+            // login success
             Navigator.of(context, rootNavigator: true).pop();
-            ShareDataWidget.of(context).data.loginResponse = response;
             Preferences.setString(Constants.PREF_USERNAME, _username.text);
             if (isRememberPassword) {
               Preferences.setStringSecurity(
@@ -192,33 +197,19 @@ class LoginPageState extends State<LoginPage> {
             }
             Preferences.setBool(Constants.PREF_IS_OFFLINE_LOGIN, false);
             Navigator.of(context).pop(true);
-          },
-          onFailure: (DioError e) {
+            break;
+          case 1001:
+            // password wrong.
+            ApUtils.showToast(context, ap.loginFail);
+            break;
+          default:
             Navigator.of(context, rootNavigator: true).pop();
-            ApUtils.handleDioError(context, e, gravity: gravity);
-            if (e.type != DioErrorType.CANCEL) _offlineLogin();
-          },
-          onError: (GeneralResponse response) {
-            Navigator.of(context, rootNavigator: true).pop();
-            String message = '';
-            switch (response.statusCode) {
-              case Helper.SCHOOL_SERVER_ERROR:
-                message = ap.schoolSeverError;
-                break;
-              case Helper.API_SERVER_ERROR:
-                message = ap.apiSeverError;
-                break;
-              case Helper.USER_DATA_ERROR:
-                message = ap.loginFail;
-                break;
-              default:
-                message = ap.somethingError;
-                break;
-            }
-            ApUtils.showToast(context, message);
-          },
-        ),
-      );
+            // ApUtils.handleDioError(context, e, gravity: gravity);
+            //NKUST server error.
+            if (value.errorCode > 5000) _offlineLogin();
+            break;
+        }
+      });
     }
   }
 
