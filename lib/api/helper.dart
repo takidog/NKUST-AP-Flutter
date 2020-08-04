@@ -306,35 +306,16 @@ class Helper {
     @required Semester semester,
     GeneralCallback<ScoreData> callback,
   }) async {
-    if (isExpire()) await login(username: username, password: password);
     try {
-      var response = await dio.get(
-        "/user/scores",
-        queryParameters: {
-          'year': semester.year,
-          'semester': semester.value,
-        },
-        cancelToken: cancelToken,
-      );
-      ScoreData data;
-      if (response.statusCode == 200) {
-        data = ScoreData.fromJson(response.data);
+      ResponseData response =
+          await NKUST_API.instance.scores(semester.year, semester.value);
+      switch (response.errorCode) {
+        case 2000:
+          var data = ScoreData.fromJson(response.parseData);
+          return (callback == null) ? data : callback.onSuccess(data);
+        default:
+          callback?.onError(GeneralResponse.unknownError());
       }
-      return (callback == null) ? data : callback.onSuccess(data);
-    } on DioError catch (dioError) {
-      if (dioError.hasResponse) {
-        if (dioError.isExpire && canReLogin && await reLogin(callback)) {
-          reLoginCount++;
-          return getScores(semester: semester, callback: callback);
-        } else {
-          if (dioError.isServerError)
-            callback?.onError(dioError.serverErrorResponse);
-          else
-            callback?.onFailure(dioError);
-        }
-      } else
-        callback?.onFailure(dioError);
-      if (callback == null) throw dioError;
     } catch (e) {
       callback?.onError(GeneralResponse.unknownError());
       throw e;
