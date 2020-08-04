@@ -25,6 +25,7 @@ import 'package:nkust_ap/res/assets.dart';
 import 'package:nkust_ap/utils/cache_utils.dart';
 import 'package:nkust_ap/utils/global.dart';
 import 'package:nkust_ap/widgets/share_data_widget.dart';
+import 'package:nkust_api/nkust_api.dart';
 
 import 'study/midterm_alerts_page.dart';
 import 'study/reward_and_penalty_page.dart';
@@ -488,12 +489,16 @@ class HomePageState extends State<HomePage> {
     await Future.delayed(Duration(microseconds: 30));
     var username = Preferences.getString(Constants.PREF_USERNAME, '');
     var password = Preferences.getStringSecurity(Constants.PREF_PASSWORD, '');
-    Helper.instance.login(
-      username: username,
-      password: password,
-      callback: GeneralCallback(
-        onSuccess: (LoginResponse response) {
-          ShareDataWidget.of(context).data.loginResponse = response;
+    NKUST_API.instance
+        .apLogin(username, password)
+        .then((ResponseData value) async {
+      print(
+          "Login debug message errorCode:${value.errorCode}, errorMessage:${value.errorMessage}");
+
+      switch (value.errorCode) {
+        case 1000:
+          // login success
+          // ShareDataWidget.of(context).data.loginResponse = response;
           isLogin = true;
           Preferences.setBool(Constants.PREF_IS_OFFLINE_LOGIN, false);
           _getUserInfo();
@@ -502,46 +507,24 @@ class HomePageState extends State<HomePage> {
             _getAnnouncements();
           }
           _homeKey.currentState.showBasicHint(text: ap.loginSuccess);
-        },
-        onFailure: (DioError e) {
-          final text = ApLocalizations.dioError(context, e);
+
+          break;
+        case 1001:
+          // password wrong.
+          ApUtils.showToast(context, ap.loginFail);
+          break;
+        default:
           _homeKey.currentState.showSnackBar(
-            text: text,
+            text: value.errorMessage,
             actionText: ap.retry,
             onSnackBarTapped: _login,
           );
           Preferences.setBool(Constants.PREF_IS_OFFLINE_LOGIN, true);
           ApUtils.showToast(context, ap.loadOfflineData);
           isLogin = true;
-        },
-        onError: (GeneralResponse response) {
-          Navigator.of(context, rootNavigator: true).pop();
-          String message = '';
-          switch (response.statusCode) {
-            case Helper.SCHOOL_SERVER_ERROR:
-              message = ap.schoolSeverError;
-              break;
-            case Helper.API_SERVER_ERROR:
-              message = ap.apiSeverError;
-              break;
-            case Helper.USER_DATA_ERROR:
-              message = ap.loginFail;
-              break;
-            default:
-              message = ap.somethingError;
-              break;
-          }
-          _homeKey.currentState.showSnackBar(
-            text: message,
-            actionText: ap.retry,
-            onSnackBarTapped: _login,
-          );
-          Preferences.setBool(Constants.PREF_IS_OFFLINE_LOGIN, true);
-          ApUtils.showToast(context, ap.loadOfflineData);
-          isLogin = true;
-        },
-      ),
-    );
+          break;
+      }
+    });
   }
 
   Future openLoginPage() async {
