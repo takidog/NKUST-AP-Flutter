@@ -295,26 +295,15 @@ class Helper {
   Future<SemesterData> getSemester({
     GeneralCallback<SemesterData> callback,
   }) async {
-    if (isExpire()) await login(username: username, password: password);
     try {
-      var response = await dio.get("/user/semesters");
-      var data = SemesterData.fromJson(response.data);
-      reLoginCount = 0;
-      return (callback == null) ? data : callback.onSuccess(data);
-    } on DioError catch (dioError) {
-      if (dioError.hasResponse) {
-        if (dioError.isExpire && canReLogin && await reLogin(callback)) {
-          reLoginCount++;
-          return getSemester(callback: callback);
-        } else {
-          if (dioError.isServerError)
-            callback?.onError(dioError.serverErrorResponse);
-          else
-            callback?.onFailure(dioError);
-        }
-      } else
-        callback?.onFailure(dioError);
-      if (callback == null) throw dioError;
+      ResponseData response = await NKUST_API.instance.semesters();
+      switch (response.errorCode) {
+        case 2000:
+          var data = SemesterData.fromJson(response.parseData);
+          return (callback == null) ? data : callback.onSuccess(data);
+        default:
+          callback?.onError(GeneralResponse.unknownError());
+      }
     } catch (e) {
       callback?.onError(GeneralResponse.unknownError());
       throw e;
