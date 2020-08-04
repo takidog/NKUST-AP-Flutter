@@ -32,6 +32,7 @@ import 'package:nkust_ap/models/reward_and_penalty_data.dart';
 import 'package:nkust_ap/models/room_data.dart';
 import 'package:nkust_ap/models/server_info_data.dart';
 import 'package:nkust_ap/utils/utils.dart';
+import 'package:nkust_api/nkust_api.dart';
 
 export 'package:ap_common/callback/general_callback.dart';
 
@@ -365,41 +366,22 @@ class Helper {
     @required Semester semester,
     GeneralCallback<CourseData> callback,
   }) async {
-    if (isExpire()) await login(username: username, password: password);
-    try {
-      var response = await dio.get(
-        '/user/coursetable',
-        queryParameters: {
-          'year': semester.year,
-          'semester': semester.value,
-        },
-        cancelToken: cancelToken,
-      );
-      CourseData data;
-      if (response.statusCode != 204) {
-        data = CourseData.fromJson(response.data);
-        data.updateIndex();
-        reLoginCount = 0;
-      }
+    var response =
+        await NKUST_API.instance.coursetable(semester.year, semester.value);
+
+    CourseData data;
+    if (response.errorCode == 2000 &&
+        response.parseData["courses"].length > 0) {
+      data = CourseData.fromJson(response.parseData);
+      data.updateIndex();
+
       return (callback == null) ? data : callback.onSuccess(data);
-    } on DioError catch (dioError) {
-      if (dioError.hasResponse) {
-        if (dioError.isExpire && canReLogin && await reLogin(callback)) {
-          reLoginCount++;
-          return getCourseTables(semester: semester, callback: callback);
-        } else {
-          if (dioError.isServerError)
-            callback?.onError(dioError.serverErrorResponse);
-          else
-            callback?.onFailure(dioError);
-        }
-      } else
-        callback?.onFailure(dioError);
-      if (callback == null) throw dioError;
-    } catch (e) {
-      callback?.onError(GeneralResponse.unknownError());
-      throw e;
     }
+    if (response.errorCode >= 5000) {
+      callback.onError(
+          GeneralResponse(statusCode: 500, message: response.errorMessage));
+    }
+
     return null;
   }
 
