@@ -137,6 +137,7 @@ class WebApHelper {
     Map<String, String> queryData, {
     String cacheKey,
     Duration cacheExpiredTime,
+    bool bytesResponse,
   }) async {
     /*
     Retrun type Response <Dio>
@@ -155,25 +156,44 @@ class WebApHelper {
     dynamic requestData;
     if (cacheKey == null) {
       _options = Options(contentType: Headers.formUrlEncodedContentType);
+      if (bytesResponse != null) {
+        _options.responseType = ResponseType.bytes;
+      }
       requestData = queryData;
     } else {
       dio.options.headers["Content-Type"] = "application/x-www-form-urlencoded";
-      _options = buildCacheOptions(
-        cacheExpiredTime ?? Duration(seconds: 60),
+      Options other_options;
+      if (bytesResponse != null) {
+        other_options = Options(responseType: ResponseType.bytes);
+      }
+      _options = buildConfigurableCacheOptions(
+        options: other_options,
+        maxAge: cacheExpiredTime ?? Duration(seconds: 60),
         primaryKey: cacheKey,
       );
       requestData = formUrlEncoded(queryData);
     }
-    Response request = await dio.post(
-      url,
-      data: requestData,
-      options: _options,
-    );
+    Response<dynamic> request;
+
+    if (bytesResponse != null) {
+      request = await dio.post<List<int>>(
+        url,
+        data: requestData,
+        options: _options,
+      );
+    } else {
+      request = await dio.post(
+        url,
+        data: requestData,
+        options: _options,
+      );
+    }
+
     if (apLoginParser(request.data) == 2) {
       if (Helper.isSupportCacheData) _manager.delete(cacheKey);
       reLoginReTryCounts += 1;
       await apLogin(username: Helper.username, password: Helper.password);
-      return apQuery(queryQid, queryData);
+      return apQuery(queryQid, queryData, bytesResponse: bytesResponse);
     }
     reLoginReTryCounts = 0;
     return request;
@@ -250,9 +270,11 @@ class WebApHelper {
 
   Future<CourseData> coursetable(String years, String semesterValue) async {
     if (!Helper.isSupportCacheData) {
+      ;
       var query = await apQuery(
         "ag222",
         {"arg01": years, "arg02": semesterValue},
+        bytesResponse: true,
       );
       return CourseData.fromJson(coursetableParser(query.data));
     }
@@ -261,6 +283,7 @@ class WebApHelper {
       {"arg01": years, "arg02": semesterValue},
       cacheKey: "${coursetableCacheKey}_${years}_${semesterValue}",
       cacheExpiredTime: Duration(hours: 6),
+      bytesResponse: true,
     );
     var parsedData = coursetableParser(query.data);
     if (parsedData["courses"].length == 0) {
